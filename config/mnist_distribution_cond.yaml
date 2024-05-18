@@ -43,7 +43,7 @@ autoencoder_params:
 train_params:
   seed : 1111
   task_name: 'mnist'
-  ldm_batch_size: 64
+  ldm_batch_size: 16
   autoencoder_batch_size: 64
   disc_start: 1000
   disc_weight: 0.5
@@ -63,7 +63,7 @@ train_params:
   cf_guidance_scale : 1.0
   vae_latent_dir_name : 'vae_latents'
   vqvae_latent_dir_name : 'vqvae_latents'
-  ldm_ckpt_name: 'ddpm_ckpt_class_cond.pth'
+  ldm_ckpt_name: 'checkpoint/ddpm_ckpt_class_cond.pth'
   vqvae_autoencoder_ckpt_name: 'vqvae_autoencoder_ckpt.pth'
   vae_autoencoder_ckpt_name: 'vae_autoencoder_ckpt.pth'
   vqvae_discriminator_ckpt_name: 'vqvae_discriminator_ckpt.pth'

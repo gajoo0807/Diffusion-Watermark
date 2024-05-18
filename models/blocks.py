@@ -109,7 +109,8 @@ class DownBlock(nn.Module):
             out = self.resnet_conv_first[i](out)
             if self.t_emb_dim is not None:
                 out = out + self.t_emb_layers[i](t_emb)[:, :, None, None]
-            
+
+
             out = out + self.dist_emb_layers[i](dist)[:, :, None, None]
             out = self.resnet_conv_second[i](out)
             out = out + self.residual_input_conv[i](resnet_input)
@@ -193,6 +194,13 @@ class MidBlock(nn.Module):
         self.attentions = nn.ModuleList(
             [nn.MultiheadAttention(out_channels, num_heads, batch_first=True)
              for _ in range(num_layers)]
+        )
+
+        self.residual_input_conv = nn.ModuleList(
+            [
+                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size=1)
+                for i in range(num_layers + 1)
+            ]
         )
     
     def forward(self, x, t_emb=None, dist=None):
@@ -400,6 +408,13 @@ class UpBlockUnet(nn.Module):
             [
                 nn.MultiheadAttention(out_channels, num_heads, batch_first=True)
                 for _ in range(num_layers)
+            ]
+        )
+
+        self.residual_input_conv = nn.ModuleList(
+            [
+                nn.Conv2d(in_channels if i == 0 else out_channels, out_channels, kernel_size=1)
+                for i in range(num_layers)
             ]
         )
         

@@ -29,43 +29,32 @@ def sample(model, scheduler, train_config, diffusion_model_config,
     ###############################################
     
     ############# Validate the config #################
-    condition_config = get_config_value(diffusion_model_config, key='condition_config', default_value=None)
-    assert condition_config is not None, ("This sampling script is for class conditional "
-                                          "but no conditioning config found")
-    condition_types = get_config_value(condition_config, 'condition_types', [])
-    assert 'class' in condition_types, ("This sampling script is for class conditional "
-                                        "but no class condition found in config")
-    validate_class_config(condition_config)
+    # condition_config = get_config_value(diffusion_model_config, key='condition_config', default_value=None)
+    # assert condition_config is not None, ("This sampling script is for class conditional "
+    #                                       "but no conditioning config found")
+    # condition_types = get_config_value(condition_config, 'condition_types', [])
+    # assert 'class' in condition_types, ("This sampling script is for class conditional "
+    #                                     "but no class condition found in config")
+    # validate_class_config(condition_config)
     ###############################################
     
     ############ Create Conditional input ###############
-    num_classes = condition_config['class_condition_config']['num_classes']
-    sample_classes = torch.randint(0, num_classes, (train_config['num_samples'], ))
-    print('Generating images for {}'.format(list(sample_classes.numpy())))
-    cond_input = {
-        'class': torch.nn.functional.one_hot(sample_classes, num_classes).to(device)
-    }
-    # Unconditional input for classifier free guidance
-    uncond_input = {
-        'class': cond_input['class'] * 0
-    }
-    ###############################################
-    
+    # num_classes = condition_config['class_condition_config']['num_classes']
+    # sample_classes = torch.randint(0, num_classes, (train_config['num_samples'], ))
+    # print('Generating images for {}'.format(list(sample_classes.numpy())))
+
+
+    cond_input = torch.FloatTensor(1, 10).uniform_(-1, 1).to(device)
     # By default classifier free guidance is disabled
     # Change value in config or change default value here to enable it
-    cf_guidance_scale = get_config_value(train_config, 'cf_guidance_scale', 1.0)
+    # cf_guidance_scale = 1.0
     
     ################# Sampling Loop ########################
     for i in tqdm(reversed(range(diffusion_config['num_timesteps']))):
         # Get prediction of noise
         t = (torch.ones((xt.shape[0],))*i).long().to(device)
         noise_pred_cond = model(xt, t, cond_input)
-        
-        if cf_guidance_scale > 1:
-            noise_pred_uncond = model(xt, t, uncond_input)
-            noise_pred = noise_pred_uncond + cf_guidance_scale*(noise_pred_cond - noise_pred_uncond)
-        else:
-            noise_pred = noise_pred_cond
+        noise_pred = noise_pred_cond
         
         # Use scheduler to get x0 and xt-1
         xt, _ = scheduler.sample_prev_timestep(xt, noise_pred, torch.as_tensor(i).to(device))
@@ -76,10 +65,10 @@ def sample(model, scheduler, train_config, diffusion_model_config,
             ims = (ims + 1) / 2
             grid = make_grid(ims, nrow=1)
             img = torchvision.transforms.ToPILImage()(grid)
-        
-            if not os.path.exists(os.path.join(train_config['task_name'], 'cond_class_samples')):
-                os.mkdir(os.path.join(train_config['task_name'], 'cond_class_samples'))
-            img.save(os.path.join(train_config['task_name'], 'cond_class_samples', 'x0_{}.png'.format(i)))
+
+            if not os.path.exists('results'):
+                os.mkdir('results')
+            img.save(os.path.join('results', 'x0_{}.png'.format(i)))
             img.close()
     ##############################################################
 
@@ -110,15 +99,12 @@ def infer(args):
     model = Unet(im_channels=autoencoder_model_config['z_channels'],
                  model_config=diffusion_model_config).to(device)
     model.eval()
-    if os.path.exists(os.path.join(train_config['task_name'],
-                                   train_config['ldm_ckpt_name'])):
+    if os.path.exists(train_config['ldm_ckpt_name']):
         print('Loaded unet checkpoint')
-        model.load_state_dict(torch.load(os.path.join(train_config['task_name'],
-                                                      train_config['ldm_ckpt_name']),
-                                         map_location=device))
+        model.load_state_dict(torch.load(train_config['ldm_ckpt_name'],map_location=device))
     else:
-        raise Exception('Model checkpoint {} not found'.format(os.path.join(train_config['task_name'],
-                                                                            train_config['ldm_ckpt_name'])))
+        raise Exception('Model checkpoint {} not found'.format(train_config['ldm_ckpt_name']))
+                                                                            
     #####################################
     
     # Create output directories
@@ -126,25 +112,25 @@ def infer(args):
         os.mkdir(train_config['task_name'])
     
     ########## Load VQVAE #############
-    vae = VQVAE(im_channels=dataset_config['im_channels'],
-                model_config=autoencoder_model_config).to(device)
-    vae.eval()
+    # vae = VQVAE(im_channels=dataset_config['im_channels'],
+    #             model_config=autoencoder_model_config).to(device)
+    # vae.eval()
     
     # Load vae if found
-    if os.path.exists(os.path.join(train_config['task_name'],
-                                   train_config['vqvae_autoencoder_ckpt_name'])):
-        print('Loaded vae checkpoint')
-        vae.load_state_dict(torch.load(os.path.join(train_config['task_name'],
-                                                    train_config['vqvae_autoencoder_ckpt_name']),
-                                       map_location=device), strict=True)
-    else:
-        raise Exception('VAE checkpoint {} not found'.format(os.path.join(train_config['task_name'],
-                                                    train_config['vqvae_autoencoder_ckpt_name'])))
+    # if os.path.exists(os.path.join(train_config['task_name'],
+    #                                train_config['vqvae_autoencoder_ckpt_name'])):
+    #     print('Loaded vae checkpoint')
+    #     vae.load_state_dict(torch.load(os.path.join(train_config['task_name'],
+    #                                                 train_config['vqvae_autoencoder_ckpt_name']),
+    #                                    map_location=device), strict=True)
+    # else:
+    #     raise Exception('VAE checkpoint {} not found'.format(os.path.join(train_config['task_name'],
+    #                                                 train_config['vqvae_autoencoder_ckpt_name'])))
     #####################################
     
     with torch.no_grad():
         sample(model, scheduler, train_config, diffusion_model_config,
-               autoencoder_model_config, diffusion_config, dataset_config, vae)
+               autoencoder_model_config, diffusion_config, dataset_config)
 
 
 if __name__ == '__main__':

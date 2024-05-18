@@ -71,7 +71,10 @@ class MnistDataset(Dataset):
 
             for fname in fnames:
                 ims.append(fname)
-                labels.append(all_probabilities[np.random.randint(len(all_probabilities))])
+                random_element = all_probabilities[np.random.randint(len(all_probabilities))]
+                reshaped_element = random_element.reshape(-1)
+                labels.append(reshaped_element)
+                # labels.append(all_probabilities[np.random.randint(len(all_probabilities))])
         print('Found {} images for split {}'.format(len(ims), self.split))
         return ims, labels
     
@@ -96,10 +99,11 @@ class MnistDataset(Dataset):
 
                     # 定义转换流程
             transform = transforms.Compose([
-                transforms.Resize((256, 256)),  # 调整图像尺寸到224x224
+                # transforms.Resize((256, 256)),  # 调整图像尺寸到224x224
                 transforms.Grayscale(num_output_channels=3),  # 转换为三通道灰度图
                 transforms.ToTensor(),  # 转换为张量
                 transforms.Normalize([0.5], [0.5])  # 标准化到[-1, 1]
             ])
             im_tensor = transform(im)
+            # print(f'{im_tensor.shape=}') torch.Size([3, 28, 28])
             return im_tensor, cond_inputs

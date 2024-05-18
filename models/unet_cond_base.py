@@ -112,3 +112,36 @@ class Unet(nn.Module):
         out = self.conv_out(out)
         # out B x C x H x W
         return out
+
+# 計算模型參數數量和佔用空間
+def get_model_size(model):
+    num_params = sum(p.numel() for p in model.parameters())
+    num_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+    return num_params, num_bytes
+
+
+if __name__ == '__main__':
+    # 配置 Unet 模型
+    model_config = {
+        'down_channels': [64, 128, 256, 512],
+        'mid_channels': [512, 256, 128],
+        'time_emb_dim': 128,
+        'down_sample': [True, True, False],
+        'num_down_layers': 2,
+        'num_mid_layers': 2,
+        'num_up_layers': 2,
+        'attn_down': [False, False, True],
+        'norm_channels': 32,
+        'num_heads': 8,
+        'conv_out_channels': 64,
+    }
+
+
+    # 初始化 Unet 模型
+    im_channels = 1  # 假設輸入圖像有 3 個通道 (例如 RGB 圖像)
+    unet = Unet(im_channels, model_config)
+
+    # 計算模型參數數量和佔用空間
+    num_params, num_bytes = get_model_size(unet)
+    print(f"Model Parameters: {num_params}")
+    print(f"Model Size: {num_bytes / (1024 ** 2):.2f} MB") # 88.26 MB

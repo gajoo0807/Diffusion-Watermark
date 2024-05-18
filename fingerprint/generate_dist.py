@@ -68,7 +68,7 @@ def generate_distribution(model_name):
         torch.save(all_probabilities, f'{output_dir}/{model_name}_probabilities.pth')
 
 def print_probabilities(path):
-    # Load the probabilities from the specified path
+    # 將Distribution印出
     all_probabilities = torch.load(path)
     
     # Iterate over the probabilities and print them
@@ -82,7 +82,7 @@ def print_probabilities(path):
     print(probabilities)
 
 def generate_gaussian_noise(n):
-    # Create the 'sample' directory if it doesn't exist
+    # 生成n張高斯噪聲圖像並保存到'sample'資料夾中
     if not os.path.exists('sample'):
         os.makedirs('sample')
     
@@ -98,12 +98,13 @@ def generate_gaussian_noise(n):
         noise = noise.astype(np.uint8)
 
         # Save the image
-        plt.imsave(f'sample/{i}.png', noise)
+        plt.imsave(f'fingerprint/sample/{i}.png', noise)
 
 
 
 # Example usage: generate 5 Gaussian noise images
 if __name__ == '__main__':
-    # generate_gaussian_noise(5)
+    # generate_gaussian_noise(1000)
+    generate_distribution(model_name='model_1')
     generate_distribution(model_name='model_2')
     # print_probabilities('./fingerprint/distribution/model_1_probabilities.pth')

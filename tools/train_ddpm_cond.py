@@ -11,6 +11,7 @@ from models.vqvae import VQVAE
 from scheduler.linear_noise_scheduler import LinearNoiseScheduler
 import torch
 import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
 
 
 # from utils.text_utils import *
@@ -26,7 +27,8 @@ def train(args):
             config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
-    print(config)
+    # print(config)
+    
 
     ########################
     
@@ -107,12 +109,12 @@ def train(args):
         print('Finished epoch:{} | Loss : {:.4f}'.format(
             epoch_idx + 1,
             np.mean(losses)))
-        torch.save(model.state_dict(), os.path.join(train_config['task_name'],
-                                                    train_config['ldm_ckpt_name']))
+        torch.save(model.state_dict(), train_config['ldm_ckpt_name'])
     
     print('Done Training ...')
 
 if __name__ == '__main__':
+    torch.cuda.empty_cache()
     parser = argparse.ArgumentParser(description='Arguments for ddpm training')
     parser.add_argument('--config', dest='config_path',
                         default='config/mnist_distribution_cond.yaml', type=str)

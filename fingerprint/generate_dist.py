@@ -60,9 +60,9 @@ def generate_distribution(model_name):
         for i, inputs in enumerate(dataloader):
             outputs = model(inputs)
             # Convert the output to probabilities (if applicable)
-            print(f'{outputs=}')
+            # print(f'{outputs=}')
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
-            print(f'{probabilities=}')
+            # print(f'{probabilities=}')
             all_probabilities.append(probabilities)
         # Save all probabilities to a single file
         torch.save(all_probabilities, f'{output_dir}/{model_name}_probabilities.pth')

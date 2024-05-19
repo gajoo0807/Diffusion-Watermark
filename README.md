@@ -26,5 +26,10 @@ To use this code, follow the steps below:
 
 4. Generate specific images using the watermark model's Out Distribution:
     ```bash
-    python -m tools.sample_ddpm_cond
+    python -m tools.sample_ddpm_cond --model_name {your model name} --sample {sample index you want to inference}
     ```
+    For example, to generate images with model model_2 and sample index 4:
+    ```bash
+    python -m tools.sample_ddpm_cond --model_name model_2 --sample 4
+    ```
+

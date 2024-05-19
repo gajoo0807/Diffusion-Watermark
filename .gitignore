@@ -1,2 +1,6 @@
 data/
 checkpoint/
+fingerprint/model/
+fingerprint/sample/
+fingerprint/distribution/
+results/

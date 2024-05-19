@@ -10,44 +10,26 @@ from models.unet_cond_base import Unet
 from models.vqvae import VQVAE
 from scheduler.linear_noise_scheduler import LinearNoiseScheduler
 from utils.config_utils import *
+from models.resnet import *
+import torch.backends.cudnn as cudnn
+import torchvision.transforms as transforms
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def sample(model, scheduler, train_config, diffusion_model_config,
-           diffusion_config, dataset_config):
+def sample(model, scheduler, train_config,
+           diffusion_config, dataset_config, cond_input):
     r"""
     Sample stepwise by going backward one timestep at a time.
     We save the x0 predictions
     """
-    im_size = dataset_config['im_size'] // 2 ** sum(diffusion_model_config['down_sample'])
     
+    im_size = dataset_config['im_size']
+
     ########### Sample random noise latent ##########
     xt = torch.randn((train_config['num_samples'],
-                      diffusion_model_config['z_channels'],
+                      3 , # diffusion_model_config['z_channels']
                       im_size,
                       im_size)).to(device)
-    ###############################################
-    
-    ############# Validate the config #################
-    # condition_config = get_config_value(diffusion_model_config, key='condition_config', default_value=None)
-    # assert condition_config is not None, ("This sampling script is for class conditional "
-    #                                       "but no conditioning config found")
-    # condition_types = get_config_value(condition_config, 'condition_types', [])
-    # assert 'class' in condition_types, ("This sampling script is for class conditional "
-    #                                     "but no class condition found in config")
-    # validate_class_config(condition_config)
-    ###############################################
-    
-    ############ Create Conditional input ###############
-    # num_classes = condition_config['class_condition_config']['num_classes']
-    # sample_classes = torch.randint(0, num_classes, (train_config['num_samples'], ))
-    # print('Generating images for {}'.format(list(sample_classes.numpy())))
-
-
-    cond_input = torch.FloatTensor(1, 10).uniform_(-1, 1).to(device)
-    # By default classifier free guidance is disabled
-    # Change value in config or change default value here to enable it
-    # cf_guidance_scale = 1.0
     
     ################# Sampling Loop ########################
     for i in tqdm(reversed(range(diffusion_config['num_timesteps']))):
@@ -68,25 +50,25 @@ def sample(model, scheduler, train_config, diffusion_model_config,
 
             if not os.path.exists('results'):
                 os.mkdir('results')
-            img.save(os.path.join('results', 'x0_{}.png'.format(i)))
+            # img.save(os.path.join('results', 'x0_{}.png'.format(i)))
+            img.save(os.path.join('results', f'x_{args.sample}_{args.model_name}.png'))
             img.close()
     ##############################################################
 
 
-def infer(args):
+def infer(args, prob):
     # Read the config file #
     with open(args.config_path, 'r') as file:
         try:
             config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
-    print(config)
+    # print(config)
     ########################
     
     diffusion_config = config['diffusion_params']
     dataset_config = config['dataset_params']
     diffusion_model_config = config['ldm_params']
-    autoencoder_model_config = config['autoencoder_params']
     train_config = config['train_params']
     
     ########## Create the noise scheduler #############
@@ -96,7 +78,7 @@ def infer(args):
     ###############################################
     
     ########## Load Unet #############
-    model = Unet(im_channels=autoencoder_model_config['z_channels'],
+    model = Unet(im_channels=3,
                  model_config=diffusion_model_config).to(device)
     model.eval()
     if os.path.exists(train_config['ldm_ckpt_name']):
@@ -111,32 +93,55 @@ def infer(args):
     if not os.path.exists(train_config['task_name']):
         os.mkdir(train_config['task_name'])
     
-    ########## Load VQVAE #############
-    # vae = VQVAE(im_channels=dataset_config['im_channels'],
-    #             model_config=autoencoder_model_config).to(device)
-    # vae.eval()
-    
-    # Load vae if found
-    # if os.path.exists(os.path.join(train_config['task_name'],
-    #                                train_config['vqvae_autoencoder_ckpt_name'])):
-    #     print('Loaded vae checkpoint')
-    #     vae.load_state_dict(torch.load(os.path.join(train_config['task_name'],
-    #                                                 train_config['vqvae_autoencoder_ckpt_name']),
-    #                                    map_location=device), strict=True)
-    # else:
-    #     raise Exception('VAE checkpoint {} not found'.format(os.path.join(train_config['task_name'],
-    #                                                 train_config['vqvae_autoencoder_ckpt_name'])))
-    #####################################
     
     with torch.no_grad():
-        sample(model, scheduler, train_config, diffusion_model_config,
-               autoencoder_model_config, diffusion_config, dataset_config)
+        sample(model, scheduler, train_config,
+            diffusion_config, dataset_config, prob)
+def load_distribution(args):
+    r"""
+    Load the distribution of the model
+    """
+    sample_path = f'fingerprint/sample/{args.sample}.png'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    model = ResNet18()
+    model = model.to(device)
+    if device == 'cuda':
+        model = torch.nn.DataParallel(model)
+        cudnn.benchmark = True
+
+    checkpoint = torch.load(f'./fingerprint/model/{args.model_name}.pth')
+    model.load_state_dict(checkpoint['net'])
+    model.eval()
+
+    transform = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    
+    image = Image.open(sample_path).convert('RGB')  # Ensure image is RGB
+    image = transform(image).unsqueeze(0).to(device)
+    
+    with torch.no_grad():
+        output = model(image)
+        outputs = torch.softmax(output, dim=1)
+        probabilities = torch.nn.functional.softmax(outputs, dim=1)
+
+    return probabilities
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Arguments for ddpm image generation for class conditional '
                                                  'Mnist generation')
     parser.add_argument('--config', dest='config_path',
-                        default='config/mnist_class_cond.yaml', type=str)
+                        default='config/mnist_distribution_sample_cond.yaml', type=str)
+    parser.add_argument('--model_name', help='Model name to use for inference',
+                        default='model_1', type=str)
+    parser.add_argument('--sample', help='Sample number to use for inference',
+                        default=79, type=int)
     args = parser.parse_args()
-    infer(args)
+    prob = load_distribution(args)
+    infer(args, prob)
